@@ -11,6 +11,7 @@ import {
   Calendar,
   MapPin,
   Package,
+  Image as ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -27,27 +28,29 @@ import {
   deleteOrderGroup,
 } from "../../actions";
 import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 export default function GroupDetailPage({
-  params: paramsPromise,
+  params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const params = use(paramsPromise);
+  const { id } = use(params);
   const router = useRouter();
   const [group, setGroup] = useState<OrderGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Order>>({});
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     loadGroup();
-  }, [params.id]);
+  }, [id]);
 
   async function loadGroup() {
     setLoading(true);
     const groups = await getOrderGroups();
-    const foundGroup = groups.find((g) => g.id === params.id);
+    const foundGroup = groups.find((g) => g.id === id);
     setGroup(foundGroup || null);
     setLoading(false);
   }
@@ -87,13 +90,11 @@ export default function GroupDetailPage({
   };
 
   const handleDeleteGroup = async () => {
-    if (
-      !confirm("Вы уверены, что хотите удалить всю группу со всеми заказами?")
-    )
+    if (!confirm("Вы уверены, что хотите удалить всю группу и все ее заказы?"))
       return;
 
     try {
-      await deleteOrderGroup(params.id);
+      await deleteOrderGroup(id);
       router.push("/");
     } catch (error) {
       alert("Не удалось удалить группу");
@@ -109,27 +110,92 @@ export default function GroupDetailPage({
     }
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Пожалуйста, загрузите изображение");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Изображение должно быть меньше 5МБ");
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const img = document.createElement("img");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 800;
+
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx?.drawImage(img, 0, 0, width, height);
+        const base64String = canvas.toDataURL("image/jpeg", 0.7);
+
+        setEditForm({ ...editForm, image_url: base64String });
+        setUploadingImage(false);
+      };
+
+      img.onerror = () => {
+        alert("Не удалось загрузить изображение");
+        setUploadingImage(false);
+      };
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => {
+        alert("Не удалось прочитать изображение");
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Не удалось загрузить изображение");
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = () => {
+    setEditForm({ ...editForm, image_url: null });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/30 to-white flex items-center justify-center">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-gray-200 rounded-full"></div>
-          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-        </div>
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (!group) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/30 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">
+          <h2 className="text-xl font-bold mb-4 text-stone-900">
             Группа не найдена
           </h2>
           <Link
             href="/"
-            className="px-6 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors"
           >
             На главную
           </Link>
@@ -142,26 +208,28 @@ export default function GroupDetailPage({
   const completedCount = orders.filter((o) => o.done).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/30 to-white">
+    <div className="min-h-screen bg-stone-50">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
-          <div className="flex items-center gap-2 mb-2">
+      <header className="sticky top-0 z-10 bg-white border-b-2 border-orange-100 shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-3 mb-3">
             <Link
               href="/"
-              className="p-1 -ml-1 hover:bg-gray-100 rounded transition-all duration-200"
+              className="p-2 -ml-2 hover:bg-stone-100 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
+              <ArrowLeft className="w-6 h-6 text-stone-600" />
             </Link>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900">{group.name}</h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {format(new Date(group.created_at), "MMMM dd, yyyy")}
+              <h1 className="text-xl font-bold text-stone-900">{group.name}</h1>
+              <p className="text-sm text-stone-500">
+                {format(new Date(group.created_at), "d MMMM yyyy 'г.'", {
+                  locale: ru,
+                })}
               </p>
             </div>
             <button
               onClick={handleDeleteGroup}
-              className="p-1 -mr-1 text-red-500 hover:bg-red-50 rounded transition-all duration-200"
+              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -169,18 +237,18 @@ export default function GroupDetailPage({
 
           {/* Progress */}
           {orders.length > 0 && (
-            <div className="bg-white p-2 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                <span className="font-semibold text-xs">
+            <div>
+              <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
+                <span>
                   {completedCount} из {orders.length} готово
                 </span>
-                <span className="font-bold bg-gray-100 px-2 py-0.5 rounded text-xs text-gray-700">
+                <span className="font-semibold text-stone-700">
                   {Math.round((completedCount / orders.length) * 100)}%
                 </span>
               </div>
-              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-orange-500 via-orange-400 to-orange-600 transition-all duration-700 rounded-full shadow-lg shadow-orange-500/30"
+                  className="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-500"
                   style={{
                     width: `${(completedCount / orders.length) * 100}%`,
                   }}
@@ -192,36 +260,34 @@ export default function GroupDetailPage({
       </header>
 
       {/* Orders */}
-      <main className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-3">
+      <main className="max-w-2xl mx-auto px-4 py-6">
         {orders.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-gray-100 to-gray-50 mb-6">
-              <Package className="w-12 h-12 text-gray-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Нет заказов в этой группе
+          <div className="text-center py-20">
+            <Package className="w-16 h-16 mx-auto text-stone-400 mb-4" />
+            <h2 className="text-xl font-bold mb-2 text-stone-900">
+              No orders in this group
             </h2>
-            <p className="text-gray-500">Это не должно было произойти!</p>
+            <p className="text-stone-500">This shouldn't happen!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-4">
             {orders.map((order, index) => {
               const isEditing = editingOrder === order.id;
 
               return (
                 <div
                   key={order.id}
-                  className="bg-white rounded-2xl p-3 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-3 duration-500"
+                  className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 transition-all duration-200"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold text-base text-gray-900">
+                        <h3 className="font-bold text-lg text-stone-900">
                           {order.customer_name}
                         </h3>
                         <span
-                          className={`px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap ${
+                          className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                             order.keychain_type === "GH"
                               ? "bg-blue-100 text-blue-700"
                               : order.keychain_type === "2G"
@@ -243,20 +309,20 @@ export default function GroupDetailPage({
                           }`}
                         >
                           {order.status === "critical"
-                            ? "🔴 Critical"
+                            ? "🔴 Критический"
                             : order.status === "done"
-                              ? "🟢 Done"
-                              : "🟠 Normal"}
+                              ? "🟢 Готово"
+                              : "🟠 Обычный"}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-600 italic font-medium">
+                      <p className="text-sm text-stone-500 italic mb-2">
                         "{order.phrase}"
                       </p>
                     </div>
                     {!isEditing && (
                       <button
                         onClick={() => startEdit(order)}
-                        className="p-1 hover:bg-gray-100 rounded transition-all duration-200 ml-2 flex-shrink-0"
+                        className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
                       >
                         <Edit2 className="w-4 h-4 text-orange-500" />
                       </button>
@@ -264,10 +330,64 @@ export default function GroupDetailPage({
                   </div>
 
                   {isEditing ? (
-                    <div className="space-y-3 border-t-2 border-gray-200 pt-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-4 border-t-2 border-stone-200 pt-4">
+                      {/* Image Upload in Edit Mode */}
+                      <div>
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
+                          Фото брелка
+                        </label>
+                        {editForm.image_url ? (
+                          <div className="relative">
+                            <img
+                              src={editForm.image_url}
+                              alt="Keychain preview"
+                              className="w-full h-48 object-cover rounded-xl border-2 border-stone-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(file);
+                              }}
+                              className="hidden"
+                              id="edit-image-upload"
+                            />
+                            <label
+                              htmlFor="edit-image-upload"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-xl hover:border-orange-500 transition-colors cursor-pointer bg-stone-100"
+                            >
+                              {uploadingImage ? (
+                                <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <>
+                                  <ImageIcon className="w-8 h-8 text-stone-400 mb-2" />
+                                  <span className="text-sm text-stone-500">
+                                    Нажмите, чтобы загрузить фото
+                                  </span>
+                                  <span className="text-xs text-stone-400 mt-1">
+                                    Макс. 5МБ
+                                  </span>
+                                </>
+                              )}
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-bold text-gray-900 mb-1">
+                          <label className="block text-stone-600 font-medium text-sm mb-1">
                             Дата принятия
                           </label>
                           <input
@@ -279,11 +399,11 @@ export default function GroupDetailPage({
                                 date_accepted: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                            className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-900 mb-1">
+                          <label className="block text-stone-600 font-medium text-sm mb-1">
                             Дата доставки
                           </label>
                           <input
@@ -295,13 +415,13 @@ export default function GroupDetailPage({
                                 date_delivery: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                            className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
                           Имя клиента
                         </label>
                         <input
@@ -313,12 +433,12 @@ export default function GroupDetailPage({
                               customer_name: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
                           Источник заказа
                         </label>
                         <input
@@ -330,12 +450,12 @@ export default function GroupDetailPage({
                               order_source: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
                           Фраза
                         </label>
                         <input
@@ -344,13 +464,13 @@ export default function GroupDetailPage({
                           onChange={(e) =>
                             setEditForm({ ...editForm, phrase: e.target.value })
                           }
-                          className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-bold text-gray-900 mb-1">
+                          <label className="block text-stone-600 font-medium text-sm mb-1">
                             Тип
                           </label>
                           <select
@@ -361,7 +481,7 @@ export default function GroupDetailPage({
                                 keychain_type: e.target.value as KeychainType,
                               })
                             }
-                            className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                            className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
                           >
                             <option value="GH">GH</option>
                             <option value="2G">2G</option>
@@ -370,7 +490,7 @@ export default function GroupDetailPage({
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-900 mb-1">
+                          <label className="block text-stone-600 font-medium text-sm mb-1">
                             Количество
                           </label>
                           <input
@@ -383,13 +503,15 @@ export default function GroupDetailPage({
                                 amount: parseInt(e.target.value) || 1,
                               })
                             }
-                            className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                            className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="label text-xs">Status</label>
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
+                          Статус
+                        </label>
                         <select
                           value={editForm.status || "normal"}
                           onChange={(e) =>
@@ -398,7 +520,7 @@ export default function GroupDetailPage({
                               status: e.target.value as OrderStatus,
                             })
                           }
-                          className="input-field text-sm py-2"
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm font-semibold"
                           style={{
                             backgroundColor:
                               editForm.status === "critical"
@@ -412,7 +534,6 @@ export default function GroupDetailPage({
                                 : editForm.status === "done"
                                   ? "#065F46"
                                   : "#9A3412",
-                            fontWeight: "600",
                           }}
                         >
                           <option
@@ -422,7 +543,7 @@ export default function GroupDetailPage({
                               color: "#991B1B",
                             }}
                           >
-                            🔴 Critical
+                            🔴 Критический
                           </option>
                           <option
                             value="normal"
@@ -431,7 +552,7 @@ export default function GroupDetailPage({
                               color: "#9A3412",
                             }}
                           >
-                            🟠 Normal
+                            🟠 Обычный
                           </option>
                           <option
                             value="done"
@@ -440,13 +561,13 @@ export default function GroupDetailPage({
                               color: "#065F46",
                             }}
                           >
-                            🟢 Done
+                            🟢 Готово
                           </option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
                           Тип доставки
                         </label>
                         <select
@@ -457,17 +578,15 @@ export default function GroupDetailPage({
                               delivery_type: e.target.value as DeliveryType,
                             })
                           }
-                          className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
                         >
-                          <option value="to deliver">Несть и доставить</option>
-                          <option value="comes and takes">
-                            Клиент делает заказ
-                          </option>
+                          <option value="to deliver">Доставка</option>
+                          <option value="comes and takes">Самовывоз</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                        <label className="block text-stone-600 font-medium text-sm mb-1">
                           Адрес
                         </label>
                         <textarea
@@ -478,101 +597,114 @@ export default function GroupDetailPage({
                               address: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 text-sm rounded-lg border-2 border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 resize-none transition-all"
-                          rows={3}
+                          className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 resize-none"
+                          rows={2}
                         />
                       </div>
 
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={saveEdit}
-                          className="flex-1 py-2 px-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white font-bold text-sm rounded-lg transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-1"
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors"
                         >
-                          <Save className="w-3.5 h-3.5" />
+                          <Save className="w-4 h-4" />
                           Сохранить
                         </button>
                         <button
                           onClick={cancelEdit}
-                          className="flex-1 py-2 px-3 bg-gray-100 text-gray-700 font-bold text-sm rounded-lg transition-all hover:bg-gray-200 flex items-center justify-center gap-1"
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-stone-100 text-stone-700 rounded-xl font-semibold hover:bg-stone-200 transition-colors"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                           Отмена
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-200">
+                      {/* Image Display in View Mode */}
+                      {order.image_url && (
+                        <div className="mb-4">
+                          <img
+                            src={order.image_url}
+                            alt="Keychain"
+                            className="w-full h-48 object-cover rounded-xl border-2 border-stone-200"
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
                         <div className="flex items-start gap-2">
                           <Calendar className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="text-gray-500 text-xs font-medium mb-0.5">
-                              Принято
-                            </p>
-                            <p className="font-bold text-gray-900 text-xs">
-                              {format(new Date(order.date_accepted), "MMM dd")}
+                            <p className="text-stone-500 text-xs">Принято</p>
+                            <p className="font-semibold text-stone-900">
+                              {format(new Date(order.date_accepted), "d MMM", {
+                                locale: ru,
+                              })}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
-                          <Calendar className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                          <Calendar className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="text-gray-500 text-xs font-medium mb-0.5">
-                              Доставка
-                            </p>
-                            <p className="font-bold text-gray-900 text-xs">
-                              {format(new Date(order.date_delivery), "MMM dd")}
+                            <p className="text-stone-500 text-xs">Доставка</p>
+                            <p className="font-semibold text-stone-900">
+                              {format(new Date(order.date_delivery), "d MMM", {
+                                locale: ru,
+                              })}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-2 text-xs">
+                      <div className="flex items-start gap-2 text-sm">
                         <MapPin className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-gray-500 text-xs font-medium mb-1">
-                            {order.delivery_type}
+                          <p className="text-stone-500 text-xs mb-1">
+                            {order.delivery_type === "to deliver"
+                              ? "Доставка"
+                              : "Самовывоз"}
                           </p>
                           {order.address && (
-                            <p className="font-semibold text-gray-900 text-xs">
+                            <p className="font-medium text-stone-900">
                               {order.address}
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs pt-2 border-t border-gray-200">
-                        <div className="flex items-center gap-1">
-                          <Package className="w-4 h-4 text-orange-500" />
-                          <span className="font-bold text-gray-900">
+                      <div className="flex items-center gap-4 text-sm pt-2">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-stone-400" />
+                          <span className="font-semibold text-stone-900">
                             {order.amount}TMT
                           </span>
                         </div>
-                        <div className="text-gray-600 font-medium text-xs">
-                          из {order.order_source}
+                        <div className="text-stone-500">
+                          от {order.order_source}
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-gray-200">
-                        <label className="flex items-center gap-2 cursor-pointer group">
+                      <div className="flex gap-4 pt-3 border-t border-stone-200">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={order.accepted}
                             onChange={() => toggleCheckbox(order, "accepted")}
-                            className="w-5 h-5 rounded border-2 border-gray-300 text-orange-500 cursor-pointer"
+                            className="w-5 h-5 rounded border-2 border-stone-300 text-orange-500 focus:ring-orange-500"
                           />
-                          <span className="font-semibold text-gray-700 group-hover:text-orange-600 transition-colors">
-                            Принято
+                          <span className="font-semibold text-sm text-stone-900">
+                            Принят
                           </span>
                         </label>
-                        <label className="flex items-center gap-3 cursor-pointer group">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={order.done}
                             onChange={() => toggleCheckbox(order, "done")}
-                            className="w-5 h-5 rounded border-2 border-gray-300 text-green-500 cursor-pointer"
+                            className="w-5 h-5 rounded border-2 border-stone-300 text-emerald-500 focus:ring-emerald-500"
                           />
-                          <span className="font-semibold text-gray-700 group-hover:text-green-600 transition-colors">
+                          <span className="font-semibold text-sm text-stone-900">
                             Готово
                           </span>
                         </label>
@@ -580,7 +712,7 @@ export default function GroupDetailPage({
 
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
-                        className="w-full mt-1 py-1 text-red-600 hover:bg-red-50 rounded transition-all font-semibold text-xs hover:shadow-md"
+                        className="w-full mt-2 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors font-semibold"
                       >
                         Удалить заказ
                       </button>

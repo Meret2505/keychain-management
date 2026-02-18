@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Keychain Orders",
-  description: "Manage your keychain orders with ease",
+  title: "Заказы Брелков",
+  description: "Удобное управление заказами брелков",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
   themeColor: "#E85D33",
 };

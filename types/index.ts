@@ -15,6 +15,7 @@ export interface Order {
   delivery_type: DeliveryType;
   amount: number;
   status: OrderStatus;
+  image_url: string | null;
   accepted: boolean;
   done: boolean;
   created_at: string;
