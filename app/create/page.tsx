@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -66,7 +65,7 @@ export default function CreatePage() {
         keychain_type: "GH",
         address: "",
         delivery_type: "to deliver",
-        amount: 100,
+        amount: 1,
         status: "normal",
         image_url: null,
         accepted: false,
@@ -96,14 +95,10 @@ export default function CreatePage() {
 
   const handleImageUpload = async (index: number, file: File) => {
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       alert("Пожалуйста, загрузите изображение");
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert("Изображение должно быть меньше 5МБ");
       return;
@@ -112,13 +107,11 @@ export default function CreatePage() {
     setUploadingImages((prev) => ({ ...prev, [index]: true }));
 
     try {
-      // Compress and convert to base64
       const img = document.createElement("img");
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
       img.onload = () => {
-        // Calculate new dimensions (max 800px width/height)
         let width = img.width;
         let height = img.height;
         const maxSize = 800;
@@ -133,10 +126,8 @@ export default function CreatePage() {
 
         canvas.width = width;
         canvas.height = height;
-
-        // Draw and compress
         ctx?.drawImage(img, 0, 0, width, height);
-        const base64String = canvas.toDataURL("image/jpeg", 0.7); // 70% quality
+        const base64String = canvas.toDataURL("image/jpeg", 0.7);
 
         updateOrder(index, "image_url", base64String);
         setUploadingImages((prev) => ({ ...prev, [index]: false }));
@@ -169,24 +160,16 @@ export default function CreatePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!groupName.trim()) {
       alert("Пожалуйста, введите название группы");
-      return;
-    }
-
-    if (orders.length === 0) {
-      alert("Пожалуйста, добавьте хотя бы один заказ");
       return;
     }
 
     setSaving(true);
 
     try {
-      // Create the group
       const group = await createOrderGroup(groupName);
 
-      // Create all orders
       await Promise.all(
         orders.map((order) =>
           createOrder({
@@ -205,25 +188,22 @@ export default function CreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF9F5]">
+    <div className="min-h-screen bg-stone-50">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b-2 border-[#F0DED3] shadow-sm">
+      <header className="sticky top-0 z-10 bg-white border-b-2 border-orange-100 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="p-2 -ml-2 hover:bg-[#FFF4ED] rounded-lg transition-colors"
+              className="p-2 -ml-2 hover:bg-stone-100 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-6 h-6 text-[#1A1412]" />
+              <ArrowLeft className="w-6 h-6 text-stone-600" />
             </Link>
             <div>
-              <h1
-                className="text-xl font-bold text-[#1A1412]"
-                style={{ fontFamily: "Syne, sans-serif" }}
-              >
+              <h1 className="text-xl font-bold text-stone-900">
                 Создать группу заказов
               </h1>
-              <p className="text-sm text-[#8B7F77]">
+              <p className="text-sm text-stone-500">
                 {orders.length} {getOrdersText(orders.length)}
               </p>
             </div>
@@ -235,8 +215,8 @@ export default function CreatePage() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Group Name */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#F0DED3] p-5">
-            <label className="block text-sm font-semibold text-[#1A1412] mb-2">
+          <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5">
+            <label className="block text-sm font-semibold text-stone-900 mb-2">
               Название группы *
             </label>
             <input
@@ -244,7 +224,7 @@ export default function CreatePage() {
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="напр., Неделя 6-12 февраля"
-              className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
+              className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:border-orange-500 transition-colors duration-200"
               required
             />
           </div>
@@ -254,13 +234,10 @@ export default function CreatePage() {
             {orders.map((order, index) => (
               <div
                 key={index}
-                className="bg-white rounded-2xl shadow-sm border border-[#F0DED3] p-5 animate-scale-in"
+                className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3
-                    className="text-lg font-bold text-[#1A1412]"
-                    style={{ fontFamily: "Syne, sans-serif" }}
-                  >
+                  <h3 className="text-lg font-bold text-stone-900">
                     Заказ №{index + 1}
                   </h3>
                   {orders.length > 1 && (
@@ -278,8 +255,8 @@ export default function CreatePage() {
                   {/* Dates Row */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                        Дата принятия *
+                      <label className="block text-sm font-medium text-stone-600 mb-1">
+                        Дата принятия
                       </label>
                       <input
                         type="date"
@@ -287,13 +264,12 @@ export default function CreatePage() {
                         onChange={(e) =>
                           updateOrder(index, "date_accepted", e.target.value)
                         }
-                        className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                        required
+                        className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                        Дата доставки *
+                      <label className="block text-sm font-medium text-stone-600 mb-1">
+                        Дата доставки
                       </label>
                       <input
                         type="date"
@@ -301,16 +277,15 @@ export default function CreatePage() {
                         onChange={(e) =>
                           updateOrder(index, "date_delivery", e.target.value)
                         }
-                        className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                        required
+                        className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                       />
                     </div>
                   </div>
 
                   {/* Customer Name */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Имя клиента *
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Имя клиента
                     </label>
                     <input
                       type="text"
@@ -319,15 +294,14 @@ export default function CreatePage() {
                         updateOrder(index, "customer_name", e.target.value)
                       }
                       placeholder="Введите имя клиента"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                      required
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                     />
                   </div>
 
                   {/* Order Source */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Источник заказа *
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Источник заказа
                     </label>
                     <input
                       type="text"
@@ -336,15 +310,14 @@ export default function CreatePage() {
                         updateOrder(index, "order_source", e.target.value)
                       }
                       placeholder="напр., Instagram, Facebook, Лично"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                      required
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                     />
                   </div>
 
                   {/* Phrase */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Фраза на брелке *
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Фраза на брелке
                     </label>
                     <input
                       type="text"
@@ -353,16 +326,15 @@ export default function CreatePage() {
                         updateOrder(index, "phrase", e.target.value)
                       }
                       placeholder="Текст для гравировки"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                      required
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                     />
                   </div>
 
                   {/* Keychain Type & Amount */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                        Тип брелка *
+                      <label className="block text-sm font-medium text-stone-600 mb-1">
+                        Тип брелка
                       </label>
                       <select
                         value={order.keychain_type}
@@ -373,8 +345,7 @@ export default function CreatePage() {
                             e.target.value as KeychainType,
                           )
                         }
-                        className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                        required
+                        className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
                       >
                         <option value="GH">GH</option>
                         <option value="2G">2G</option>
@@ -383,8 +354,8 @@ export default function CreatePage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                        Сумма *
+                      <label className="block text-sm font-medium text-stone-600 mb-1">
+                        Количество
                       </label>
                       <input
                         type="number"
@@ -397,15 +368,15 @@ export default function CreatePage() {
                             parseInt(e.target.value) || 0,
                           )
                         }
-                        className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3]"
-                        required
+                        className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
                       />
                     </div>
                   </div>
+
                   {/* Status */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Статус *
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Статус
                     </label>
                     <select
                       value={order.status}
@@ -416,7 +387,7 @@ export default function CreatePage() {
                           e.target.value as OrderStatus,
                         )
                       }
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm font-semibold"
                       style={{
                         backgroundColor:
                           order.status === "critical"
@@ -430,9 +401,7 @@ export default function CreatePage() {
                             : order.status === "done"
                               ? "#065F46"
                               : "#9A3412",
-                        fontWeight: "600",
                       }}
-                      required
                     >
                       <option
                         value="critical"
@@ -457,8 +426,8 @@ export default function CreatePage() {
 
                   {/* Delivery Type */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Тип доставки *
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Тип доставки
                     </label>
                     <select
                       value={order.delivery_type}
@@ -469,8 +438,7 @@ export default function CreatePage() {
                           e.target.value as DeliveryType,
                         )
                       }
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] focus:outline-none focus:border-[#E85D33] transition-colors duration-200"
-                      required
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
                     >
                       <option value="to deliver">Доставка</option>
                       <option value="comes and takes">Самовывоз</option>
@@ -479,8 +447,8 @@ export default function CreatePage() {
 
                   {/* Address */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
-                      Адрес {order.delivery_type === "to deliver" && "*"}
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
+                      Адрес
                     </label>
                     <textarea
                       value={order.address}
@@ -492,15 +460,14 @@ export default function CreatePage() {
                           ? "Введите адрес доставки"
                           : "Необязательно"
                       }
-                      className="w-full px-4 py-3 rounded-xl border-2 border-[#F0DED3] bg-white text-[#1A1412] placeholder-[#8B7F77] focus:outline-none focus:border-[#E85D33] transition-colors duration-200 resize-none"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 resize-none"
                       rows={2}
-                      required={order.delivery_type === "to deliver"}
                     />
                   </div>
 
                   {/* Image Upload */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#1A1412] mb-2">
+                    <label className="block text-sm font-medium text-stone-600 mb-1">
                       Фото брелка (Необязательно)
                     </label>
                     {order.image_url ? (
@@ -508,7 +475,7 @@ export default function CreatePage() {
                         <img
                           src={order.image_url}
                           alt="Keychain preview"
-                          className="w-full h-48 object-cover rounded-xl border-2 border-[#F0DED3]"
+                          className="w-full h-48 object-cover rounded-xl border-2 border-stone-200"
                         />
                         <button
                           type="button"
@@ -532,17 +499,17 @@ export default function CreatePage() {
                         />
                         <label
                           htmlFor={`image-upload-${index}`}
-                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[#F0DED3] rounded-xl hover:border-[#E85D33] transition-colors cursor-pointer bg-[#FFF4ED]"
+                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-xl hover:border-orange-500 transition-colors cursor-pointer bg-stone-100"
                         >
                           {uploadingImages[index] ? (
-                            <div className="w-8 h-8 border-4 border-[#E85D33] border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <>
-                              <ImageIcon className="w-8 h-8 text-[#8B7F77] mb-2" />
-                              <span className="text-sm text-[#8B7F77]">
+                              <ImageIcon className="w-8 h-8 text-stone-400 mb-2" />
+                              <span className="text-sm text-stone-500">
                                 Нажмите, чтобы загрузить фото
                               </span>
-                              <span className="text-xs text-[#8B7F77] mt-1">
+                              <span className="text-xs text-stone-400 mt-1">
                                 Макс. 5МБ
                               </span>
                             </>
@@ -561,9 +528,9 @@ export default function CreatePage() {
                         onChange={(e) =>
                           updateOrder(index, "accepted", e.target.checked)
                         }
-                        className="w-5 h-5 rounded border-2 border-[#F0DED3] text-[#E85D33] focus:ring-2 focus:ring-[#E85D33]"
+                        className="w-5 h-5 rounded border-2 border-stone-300 text-orange-500 focus:ring-orange-500"
                       />
-                      <span className="font-semibold text-[#1A1412]">
+                      <span className="font-semibold text-sm text-stone-900">
                         Принят
                       </span>
                     </label>
@@ -574,9 +541,9 @@ export default function CreatePage() {
                         onChange={(e) =>
                           updateOrder(index, "done", e.target.checked)
                         }
-                        className="w-5 h-5 rounded border-2 border-[#F0DED3] text-[#52B788] focus:ring-2 focus:ring-[#52B788]"
+                        className="w-5 h-5 rounded border-2 border-stone-300 text-emerald-500 focus:ring-emerald-500"
                       />
-                      <span className="font-semibold text-[#1A1412]">
+                      <span className="font-semibold text-sm text-stone-900">
                         Готово
                       </span>
                     </label>
@@ -590,7 +557,7 @@ export default function CreatePage() {
           <button
             type="button"
             onClick={addOrder}
-            className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 active:scale-95 bg-white text-[#1A1412] border-2 border-[#F0DED3] hover:border-[#E85D33] hover:text-[#E85D33] flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 active:scale-95 bg-white text-stone-900 border-2 border-stone-200 hover:border-orange-500 hover:text-orange-500 flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" />
             Добавить еще один заказ
@@ -600,7 +567,7 @@ export default function CreatePage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 active:scale-95 bg-[#E85D33] text-white shadow-lg shadow-[#E85D33]/30 hover:shadow-xl hover:shadow-[#E85D33]/40 hover:-translate-y-0.5 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 active:scale-95 bg-orange-500 text-white shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 hover:-translate-y-0.5 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Создание..." : "Создать группу заказов"}
           </button>

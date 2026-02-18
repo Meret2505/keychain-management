@@ -12,6 +12,7 @@ import {
   MapPin,
   Package,
   Image as ImageIcon,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -26,9 +27,26 @@ import {
   updateOrder,
   deleteOrder,
   deleteOrderGroup,
+  createOrder,
 } from "../../actions";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+
+interface OrderForm {
+  date_accepted: string;
+  date_delivery: string;
+  customer_name: string;
+  order_source: string;
+  phrase: string;
+  keychain_type: KeychainType;
+  address: string;
+  delivery_type: DeliveryType;
+  amount: number;
+  status: OrderStatus;
+  image_url: string | null;
+  accepted: boolean;
+  done: boolean;
+}
 
 export default function GroupDetailPage({
   params,
@@ -42,6 +60,25 @@ export default function GroupDetailPage({
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Order>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // State for adding new order
+  const [addingNewOrder, setAddingNewOrder] = useState(false);
+  const [newOrderForm, setNewOrderForm] = useState<OrderForm>({
+    date_accepted: new Date().toISOString().split("T")[0],
+    date_delivery: "",
+    customer_name: "",
+    order_source: "",
+    phrase: "",
+    keychain_type: "GH",
+    address: "",
+    delivery_type: "to deliver",
+    amount: 1,
+    status: "normal",
+    image_url: null,
+    accepted: false,
+    done: false,
+  });
+  const [uploadingNewImage, setUploadingNewImage] = useState(false);
 
   useEffect(() => {
     loadGroup();
@@ -174,13 +211,132 @@ export default function GroupDetailPage({
     }
   };
 
+  // New order image upload
+  const handleNewOrderImageUpload = async (file: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Пожалуйста, загрузите изображение");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Изображение должно быть меньше 5МБ");
+      return;
+    }
+
+    setUploadingNewImage(true);
+
+    try {
+      const img = document.createElement("img");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 800;
+
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx?.drawImage(img, 0, 0, width, height);
+        const base64String = canvas.toDataURL("image/jpeg", 0.7);
+
+        setNewOrderForm({ ...newOrderForm, image_url: base64String });
+        setUploadingNewImage(false);
+      };
+
+      img.onerror = () => {
+        alert("Не удалось загрузить изображение");
+        setUploadingNewImage(false);
+      };
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        img.src = reader.result as string;
+      };
+      reader.onerror = () => {
+        alert("Не удалось прочитать изображение");
+        setUploadingNewImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Не удалось загрузить изображение");
+      setUploadingNewImage(false);
+    }
+  };
+
   const removeImage = () => {
     setEditForm({ ...editForm, image_url: null });
   };
 
+  const removeNewOrderImage = () => {
+    setNewOrderForm({ ...newOrderForm, image_url: null });
+  };
+
+  const cancelAddNewOrder = () => {
+    setAddingNewOrder(false);
+    setNewOrderForm({
+      date_accepted: new Date().toISOString().split("T")[0],
+      date_delivery: "",
+      customer_name: "",
+      order_source: "",
+      phrase: "",
+      keychain_type: "GH",
+      address: "",
+      delivery_type: "to deliver",
+      amount: 1,
+      status: "normal",
+      image_url: null,
+      accepted: false,
+      done: false,
+    });
+  };
+
+  const saveNewOrder = async () => {
+    if (!id) return;
+
+    try {
+      await createOrder({
+        ...newOrderForm,
+        group_id: id,
+      });
+      setAddingNewOrder(false);
+      setNewOrderForm({
+        date_accepted: new Date().toISOString().split("T")[0],
+        date_delivery: "",
+        customer_name: "",
+        order_source: "",
+        phrase: "",
+        keychain_type: "GH",
+        address: "",
+        delivery_type: "to deliver",
+        amount: 1,
+        status: "normal",
+        image_url: null,
+        accepted: false,
+        done: false,
+      });
+      loadGroup();
+    } catch (error) {
+      console.error("Error creating order:", error);
+      alert("Не удалось создать заказ");
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -261,13 +417,369 @@ export default function GroupDetailPage({
 
       {/* Orders */}
       <main className="max-w-2xl mx-auto px-4 py-6">
-        {orders.length === 0 ? (
+        {/* Add Order Button */}
+        {!addingNewOrder && (
+          <button
+            type="button"
+            onClick={() => setAddingNewOrder(true)}
+            className="w-full my-4 px-6 py-3 rounded-xl font-semibold transition-all duration-300 active:scale-95 bg-white text-stone-900 border-2 border-stone-200 hover:border-orange-500 hover:text-orange-500 flex items-center justify-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Добавить новый заказ
+          </button>
+        )}
+        {/* Add New Order Form */}
+        {addingNewOrder && (
+          <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 mb-4 animate-pulse">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-stone-900">Новый заказ</h3>
+              <button
+                type="button"
+                onClick={cancelAddNewOrder}
+                className="p-2 text-stone-500 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Image Upload */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Фото брелка
+                </label>
+                {newOrderForm.image_url ? (
+                  <div className="relative">
+                    <img
+                      src={newOrderForm.image_url}
+                      alt="Keychain preview"
+                      className="w-full h-48 object-cover rounded-xl border-2 border-stone-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeNewOrderImage}
+                      className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleNewOrderImageUpload(file);
+                      }}
+                      className="hidden"
+                      id="new-order-image-upload"
+                    />
+                    <label
+                      htmlFor="new-order-image-upload"
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-xl hover:border-orange-500 transition-colors cursor-pointer bg-stone-100"
+                    >
+                      {uploadingNewImage ? (
+                        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-8 h-8 text-stone-400 mb-2" />
+                          <span className="text-sm text-stone-500">
+                            Нажмите, чтобы загрузить фото
+                          </span>
+                          <span className="text-xs text-stone-400 mt-1">
+                            Макс. 5МБ
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-stone-600 font-medium text-sm mb-1">
+                    Дата принятия
+                  </label>
+                  <input
+                    type="date"
+                    value={newOrderForm.date_accepted}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        date_accepted: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-stone-600 font-medium text-sm mb-1">
+                    Дата доставки
+                  </label>
+                  <input
+                    type="date"
+                    value={newOrderForm.date_delivery}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        date_delivery: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                  />
+                </div>
+              </div>
+
+              {/* Customer Name */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Имя клиента
+                </label>
+                <input
+                  type="text"
+                  value={newOrderForm.customer_name}
+                  onChange={(e) =>
+                    setNewOrderForm({
+                      ...newOrderForm,
+                      customer_name: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                />
+              </div>
+
+              {/* Order Source */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Источник заказа
+                </label>
+                <input
+                  type="text"
+                  value={newOrderForm.order_source}
+                  onChange={(e) =>
+                    setNewOrderForm({
+                      ...newOrderForm,
+                      order_source: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                />
+              </div>
+
+              {/* Phrase */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Фраза
+                </label>
+                <input
+                  type="text"
+                  value={newOrderForm.phrase}
+                  onChange={(e) =>
+                    setNewOrderForm({ ...newOrderForm, phrase: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                />
+              </div>
+
+              {/* Type & Amount */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-stone-600 font-medium text-sm mb-1">
+                    Тип
+                  </label>
+                  <select
+                    value={newOrderForm.keychain_type}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        keychain_type: e.target.value as KeychainType,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
+                  >
+                    <option value="GH">GH</option>
+                    <option value="2G">2G</option>
+                    <option value="Coupled">Coupled</option>
+                    <option value="Square">Square</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-stone-600 font-medium text-sm mb-1">
+                    Количество
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newOrderForm.amount}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        amount: parseInt(e.target.value) || 1,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900"
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Статус
+                </label>
+                <select
+                  value={newOrderForm.status}
+                  onChange={(e) =>
+                    setNewOrderForm({
+                      ...newOrderForm,
+                      status: e.target.value as OrderStatus,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm font-semibold"
+                  style={{
+                    backgroundColor:
+                      newOrderForm.status === "critical"
+                        ? "#FEE2E2"
+                        : newOrderForm.status === "done"
+                          ? "#D1FAE5"
+                          : "#FED7AA",
+                    color:
+                      newOrderForm.status === "critical"
+                        ? "#991B1B"
+                        : newOrderForm.status === "done"
+                          ? "#065F46"
+                          : "#9A3412",
+                  }}
+                >
+                  <option
+                    value="critical"
+                    style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}
+                  >
+                    🔴 Критический
+                  </option>
+                  <option
+                    value="normal"
+                    style={{ backgroundColor: "#FED7AA", color: "#9A3412" }}
+                  >
+                    🟠 Обычный
+                  </option>
+                  <option
+                    value="done"
+                    style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}
+                  >
+                    🟢 Готово
+                  </option>
+                </select>
+              </div>
+
+              {/* Delivery Type */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Тип доставки
+                </label>
+                <select
+                  value={newOrderForm.delivery_type}
+                  onChange={(e) =>
+                    setNewOrderForm({
+                      ...newOrderForm,
+                      delivery_type: e.target.value as DeliveryType,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 bg-white"
+                >
+                  <option value="to deliver">Доставка</option>
+                  <option value="comes and takes">Самовывоз</option>
+                </select>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-stone-600 font-medium text-sm mb-1">
+                  Адрес
+                </label>
+                <textarea
+                  value={newOrderForm.address}
+                  onChange={(e) =>
+                    setNewOrderForm({
+                      ...newOrderForm,
+                      address: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm text-stone-900 resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Checkboxes */}
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newOrderForm.accepted}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        accepted: e.target.checked,
+                      })
+                    }
+                    className="w-5 h-5 rounded border-2 border-stone-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="font-semibold text-sm text-stone-900">
+                    Принят
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newOrderForm.done}
+                    onChange={(e) =>
+                      setNewOrderForm({
+                        ...newOrderForm,
+                        done: e.target.checked,
+                      })
+                    }
+                    className="w-5 h-5 rounded border-2 border-stone-300 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <span className="font-semibold text-sm text-stone-900">
+                    Готово
+                  </span>
+                </label>
+              </div>
+
+              {/* Save/Cancel Buttons */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={saveNewOrder}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  Сохранить
+                </button>
+                <button
+                  onClick={cancelAddNewOrder}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-stone-100 text-stone-700 rounded-xl font-semibold hover:bg-stone-200 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Orders */}
+        {orders.length === 0 && !addingNewOrder ? (
           <div className="text-center py-20">
             <Package className="w-16 h-16 mx-auto text-stone-400 mb-4" />
             <h2 className="text-xl font-bold mb-2 text-stone-900">
-              No orders in this group
+              Нет заказов в этой группе
             </h2>
-            <p className="text-stone-500">This shouldn't happen!</p>
+            <p className="text-stone-500 mb-4">
+              Добавьте первый заказ, нажав кнопку ниже
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -284,7 +796,7 @@ export default function GroupDetailPage({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-bold text-lg text-stone-900">
-                          {order.customer_name}
+                          {order.customer_name || "Без имени"}
                         </h3>
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -315,9 +827,11 @@ export default function GroupDetailPage({
                               : "🟠 Обычный"}
                         </span>
                       </div>
-                      <p className="text-sm text-stone-500 italic mb-2">
-                        "{order.phrase}"
-                      </p>
+                      {order.phrase && (
+                        <p className="text-sm text-stone-500 italic mb-2">
+                          "{order.phrase}"
+                        </p>
+                      )}
                     </div>
                     {!isEditing && (
                       <button
@@ -638,9 +1152,15 @@ export default function GroupDetailPage({
                           <div>
                             <p className="text-stone-500 text-xs">Принято</p>
                             <p className="font-semibold text-stone-900">
-                              {format(new Date(order.date_accepted), "d MMM", {
-                                locale: ru,
-                              })}
+                              {order.date_accepted
+                                ? format(
+                                    new Date(order.date_accepted),
+                                    "d MMM",
+                                    {
+                                      locale: ru,
+                                    },
+                                  )
+                                : "—"}
                             </p>
                           </div>
                         </div>
@@ -649,9 +1169,15 @@ export default function GroupDetailPage({
                           <div>
                             <p className="text-stone-500 text-xs">Доставка</p>
                             <p className="font-semibold text-stone-900">
-                              {format(new Date(order.date_delivery), "d MMM", {
-                                locale: ru,
-                              })}
+                              {order.date_delivery
+                                ? format(
+                                    new Date(order.date_delivery),
+                                    "d MMM",
+                                    {
+                                      locale: ru,
+                                    },
+                                  )
+                                : "—"}
                             </p>
                           </div>
                         </div>
@@ -680,9 +1206,11 @@ export default function GroupDetailPage({
                             {order.amount}TMT
                           </span>
                         </div>
-                        <div className="text-stone-500">
-                          от {order.order_source}
-                        </div>
+                        {order.order_source && (
+                          <div className="text-stone-500">
+                            от {order.order_source}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-4 pt-3 border-t border-stone-200">
